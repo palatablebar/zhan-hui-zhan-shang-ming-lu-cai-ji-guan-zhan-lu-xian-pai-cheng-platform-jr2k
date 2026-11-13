@@ -12,6 +12,7 @@ from src.constants.enums import (
 from src.models.exhibitor import Exhibitor
 from src.models.route_run import RouteRun
 from src.models.visit import Visit
+from src.services import route_run_service
 from src.utils.csv_export import to_csv
 
 
@@ -20,7 +21,7 @@ def visits_csv(db: Session, run_id: int | None = None) -> bytes:
     if run_id:
         stmt = stmt.where(Visit.run_id == run_id)
     else:
-        latest = db.scalar(select(RouteRun).order_by(RouteRun.id.desc()).limit(1))
+        latest = route_run_service.latest_visible_run(db)
         if latest is not None:
             stmt = stmt.where(Visit.run_id == latest.id)
     visits = db.scalars(stmt.order_by(Visit.day, Visit.seq, Visit.id)).all()

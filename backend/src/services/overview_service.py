@@ -19,7 +19,7 @@ from src.models.exhibitor import Exhibitor
 from src.models.route_run import RouteRun
 from src.models.session import Session
 from src.models.visit import Visit
-from src.services import route_service, session_service
+from src.services import route_run_service, route_service, session_service
 
 
 def worker_alive() -> bool:
@@ -113,7 +113,7 @@ def overview(db: Session) -> dict:
     sessions_total = db.scalar(select(func.count()).select_from(Session)) or 0
     runs_total = db.scalar(select(func.count()).select_from(RouteRun)) or 0
     visits_total = db.scalar(select(func.count()).select_from(Visit)) or 0
-    latest_run = db.scalar(select(RouteRun).order_by(RouteRun.id.desc()).limit(1))
+    latest_run = route_run_service.latest_visible_run(db)
     conflicts = 0
     deferred = 0
     if latest_run is not None:

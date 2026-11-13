@@ -32,7 +32,7 @@
 密码统一：`Demo@2026`。低权角色调用高权接口返回 **403**（真实 HTTP 状态，不是前端隐藏）：
 
 - `POST /api/exhibitors`、`PATCH /api/exhibitors/{id}` → 仅 admin，analyst/viewer 403；
-- `POST /api/route-runs`、`PATCH /api/visits/{id}/review` → admin/analyst，viewer 403；
+- `POST /api/route-runs`、`POST /api/route-runs/{id}/replan`、`PATCH /api/visits/{id}/review` → admin/analyst，viewer 403；
 - `GET /api/exports/visits.csv` → admin/analyst，viewer 403；
 - `GET /api/audit` → 仅 admin，analyst/viewer 403。
 
@@ -40,7 +40,7 @@
 
 1. **展商名录**：186 家展商（8 馆），按馆 / 优先级 / 品类 / 目标行业 / 是否有预约筛选；抽屉里看坐标、联系人、预约；管理员可登记与调优先级。
 2. **展馆平面图**：SVG 网格按 `x = 列号 × 3.2m`、`y = 排号 × 2.4m` 画展位点，P0 荧光黄实心；右侧给「同馆成组」蛇形建议与馆内跨度。
-3. **路线规划**：算法 B 真算两日路线，展示总步行、覆盖权重、冲突组、两日时间轴表；专员可确认 / 改期 / 顺延。
+3. **路线规划**：算法 B 真算两日路线，展示总步行、覆盖权重、冲突组、两日时间轴表；专员可确认 / 改期 / 顺延。名录变更后走「影响核对 → 增量重排」（算法 B+）：只重算受影响展商与受影响天，未受影响的人工确认逐字保留，新旧版本逐站对照，失败自动回到旧版本。
 4. **论坛日程**：24 场同期论坛按天筛选，与路线时间轴并列，便于发现撞车。
 5. **导出与审计**：观展清单 CSV（含展位、ETA、优先级、联系人电话）；登录、排程、改期、导出全量审计。
 
@@ -132,6 +132,17 @@ docker-compose.yml .env .env.example
 - **可复现**：纯确定性，无随机数、无网络；同输入两次 `plan_routes` 结果逐字一致（单测覆盖）。
 - **实测（seed 路线）**：候选 96 家 → 排入 **76 站**，总步行 **6,553m**，停留 806 分钟，覆盖权重 **296/356 = 83.1%**，冲突 **1 组**（标记 2 条 + 1 条改期），Day1 31 站 / Day2 45 站。
 
+### 算法 B+｜变更影响核对与增量重排（`route_service.py` 后半 + `route_run_service.py`）
+
+排程确认后名录仍会变（预约 / 优先级 / 展位 / 停留）。全量重排会冲掉人工确认，因此提供增量链路：
+
+- **输入快照**：每次运行在 `params.input_snapshot` 固化全部展商的排程输入（展位号、优先级、停留、预约窗口）。
+- **影响核对** `GET /api/route-runs/{id}/impact`：快照 vs 当前名录 → 字段级变更、失效到访、新入候选、受影响天、受影响的人工确认。预约窗口变化会**传播**：与新/旧窗口重叠的未变更展商一并进入影响集（冲突取舍可能翻转）。
+- **增量重排** `POST /api/route-runs/{id}/replan`：只重算受影响展商与受影响天。未受影响天整段逐字保留；受影响天上，未受影响的**人工确认站钉成固定锚点**（状态/复核人/时间不变），失效、连带释放与新增候选进重排池，池成员必有一行输出（排入或改期），绝不静默丢行。
+- **新旧对照**：`metrics.diff` 逐站标注 改时 / 换天 / 调序 / 新增 / 移出 / 转改期 / 改期→排入 / 状态重置，附原因（如「预约 10:00→14:00」「同日复排连带调整」）；`metrics.reconcile` 给出对账：来源 = 失效 + 保留，输出 = 保留未动 + 重排池，每天可见站数 before→after，`balanced=true` 才对得上。
+- **失败恢复**：规划阶段是纯函数，抛错只落一条 `failed` 运行留痕；对外可见版本 = 最近一次 success/partial（`GET /api/route-runs/current`、总览、导出都走它），旧路线不被顶掉。
+- **幂等重试**：`seed_key = replan-{基准id}-{名录指纹}`，同样变更重试返回同一运行；失败行重试先清空其到访再重算，不会重复排站（`(run_id, exhibitor_id)` 唯一约束兜底）。
+
 ## 11. 共享枚举出现位置
 
 | 枚举 | 后端 | 前端 |
@@ -144,6 +155,9 @@ docker-compose.yml .env .env.example
 | 预约冲突类型 `appointment/overtime` | `backend/src/constants/enums.py`（`CONFLICT_KIND_LABELS`） | `frontend/site/js/config.js`（`ENUMS.conflict`） |
 | 到访状态 `planned/confirmed/adjusted/deferred` | `backend/src/constants/enums.py`（`VISIT_STATUS_LABELS`） | `frontend/site/js/config.js`（`ENUMS.visitStatus`） |
 | 排程状态 `queued/running/success/partial/failed` | `backend/src/constants/enums.py`（`ROUTE_STATUS_LABELS`） | `frontend/site/js/config.js`（`ENUMS.routeStatus`） |
+| 触发方式 `manual/schedule/seed/replan` | `backend/src/constants/enums.py`（`TRIGGER_LABELS`） | `frontend/site/js/config.js`（`ENUMS.trigger`） |
+| 新旧对照类型 `added/removed/deferred/restored/day_changed/time_changed/seq_changed/status_reset` | `backend/src/constants/enums.py`（`DIFF_KIND_LABELS`） | `frontend/site/js/config.js`（`ENUMS.diffKind`） |
+| 名录变更字段 `booth_no/priority/dwell_min/appointment` | `backend/src/constants/enums.py`（`CHANGE_FIELD_LABELS`） | `frontend/site/js/config.js`（`ENUMS.changeField`） |
 
 > seed 的 `SEED_SUMMARY` 沿用批次固定键名：`sources` = 展商名录条目数，`runs` = 路线排程次数，
 > `findings` = 到访条目数（含冲突改期行），`pending` = 仍为 `planned` 的到访数。

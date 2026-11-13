@@ -25,6 +25,14 @@ def list_runs(
     return route_run_controller.list_runs(db, status=status, limit=page.limit, offset=page.offset)
 
 
+@router.get("/current")
+def get_current(
+    db: Session = Depends(get_db),
+    principal: dict = Depends(require_roles(*READ_ROLES)),
+) -> dict:
+    return route_run_controller.get_current_run(db, principal["role"])
+
+
 @router.get("/{run_id}")
 def get_run(
     run_id: int,
@@ -32,6 +40,25 @@ def get_run(
     principal: dict = Depends(require_roles(*READ_ROLES)),
 ) -> dict:
     return route_run_controller.get_run(db, run_id, principal["role"])
+
+
+@router.get("/{run_id}/impact")
+def get_impact(
+    run_id: int,
+    db: Session = Depends(get_db),
+    principal: dict = Depends(require_roles(*READ_ROLES)),
+) -> dict:
+    return route_run_controller.get_impact(db, run_id)
+
+
+@router.post("/{run_id}/replan", status_code=201)
+def replan(
+    run_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: dict = Depends(require_roles(*ROUTE_CREATE_ROLES)),
+) -> dict:
+    return route_run_controller.replan(db, run_id, principal, request)
 
 
 @router.post("", status_code=201)

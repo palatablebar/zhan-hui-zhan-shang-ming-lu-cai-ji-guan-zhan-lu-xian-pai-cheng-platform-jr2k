@@ -106,7 +106,18 @@ export const ENUMS = {
     appointment: '预约重叠',
     overtime: '超出当日',
   },
-  trigger: { manual: '手动', schedule: '定时', seed: '初始化' },
+  trigger: { manual: '手动', schedule: '定时', seed: '初始化', replan: '增量重排' },
+  diffKind: {
+    added: '新增',
+    removed: '移出',
+    deferred: '转改期',
+    restored: '改期→排入',
+    day_changed: '换天',
+    time_changed: '改时',
+    seq_changed: '调序',
+    status_reset: '状态重置',
+  },
+  changeField: { booth_no: '展位', priority: '优先级', dwell_min: '停留时长', appointment: '预约时段', removed: '名录' },
 };
 
 export function can(role, permission) {
@@ -123,4 +134,17 @@ export function visitTone(status) {
 
 export function routeTone(status) {
   return { success: 'ok', partial: 'warn', failed: 'danger', running: 'info', queued: 'info' }[status] || 'info';
+}
+
+export function diffTone(change) {
+  return {
+    added: 'ok',
+    removed: 'danger',
+    deferred: 'warn',
+    restored: 'ok',
+    day_changed: 'info',
+    time_changed: 'warn',
+    seq_changed: 'info',
+    status_reset: 'warn',
+  }[change] || 'info';
 }

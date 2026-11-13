@@ -7,6 +7,7 @@ ACTIONS: dict[str, str] = {
     "exhibitor.update": "修改展商",
     "route.create": "发起路线排程",
     "route.complete": "路线排程完成",
+    "route.replan": "增量重排（影响核对）",
     "visit.review": "复核观展路线",
     "export.visits": "导出观展清单",
     "http.mutation": "写请求",

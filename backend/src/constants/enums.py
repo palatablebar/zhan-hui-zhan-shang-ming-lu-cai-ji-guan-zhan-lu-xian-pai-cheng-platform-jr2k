@@ -167,12 +167,48 @@ class TriggerKind(StrEnum):
     MANUAL = "manual"
     SCHEDULE = "schedule"
     SEED = "seed"
+    REPLAN = "replan"
 
 
 TRIGGER_LABELS: dict[str, str] = {
     TriggerKind.MANUAL.value: "手动",
     TriggerKind.SCHEDULE.value: "定时",
     TriggerKind.SEED.value: "初始化",
+    TriggerKind.REPLAN.value: "增量重排",
+}
+
+
+class DiffKind(StrEnum):
+    """增量重排中一条到访的新旧对照类型。"""
+
+    ADDED = "added"
+    REMOVED = "removed"
+    DEFERRED = "deferred"
+    RESTORED = "restored"
+    DAY_CHANGED = "day_changed"
+    TIME_CHANGED = "time_changed"
+    SEQ_CHANGED = "seq_changed"
+    STATUS_RESET = "status_reset"
+
+
+DIFF_KIND_LABELS: dict[str, str] = {
+    DiffKind.ADDED.value: "新增",
+    DiffKind.REMOVED.value: "移出",
+    DiffKind.DEFERRED.value: "转改期",
+    DiffKind.RESTORED.value: "改期→排入",
+    DiffKind.DAY_CHANGED.value: "换天",
+    DiffKind.TIME_CHANGED.value: "改时",
+    DiffKind.SEQ_CHANGED.value: "调序",
+    DiffKind.STATUS_RESET.value: "状态重置",
+}
+
+
+# 影响核对里展商字段变更的展示名
+CHANGE_FIELD_LABELS: dict[str, str] = {
+    "booth_no": "展位",
+    "priority": "优先级",
+    "dwell_min": "停留时长",
+    "appointment": "预约时段",
 }
 
 
